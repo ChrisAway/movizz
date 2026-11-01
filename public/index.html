@@ -36,6 +36,7 @@
   #bar { height:6px; background:#2a2e3a; border-radius:3px; margin:16px 0; overflow:hidden; }
   #bar div { height:100%; background:var(--accent); width:0; }
   #solution { font-size:28px; font-weight:700; color:var(--accent); text-align:center; padding:14px; }
+  #solution .also { font-size:17px; font-weight:500; color:var(--muted); font-style:italic; margin-top:4px; }
   #solution img { display:block; margin:12px auto 0; max-height:260px; border-radius:8px; box-shadow:0 6px 24px #0008; }
   #guessForm { display:flex; gap:10px; }
   #guessForm input { flex:1; }
@@ -175,6 +176,7 @@ function render(s) {
   $('solution').classList.toggle('hidden', s.phase !== 'reveal');
   if (s.phase === 'reveal') {
     $('solution').textContent = s.year ? `${s.solution} (${s.year})` : s.solution;
+    if (s.otherTitles?.length) $('solution').append(el('div', s.otherTitles[0], 'also'));
     if (s.poster) {
       const img = el('img');
       img.src = s.poster;

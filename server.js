@@ -19,6 +19,7 @@ const tmdb = process.env.TMDB_API_KEY
   ? createTmdbSource({
       apiKey: process.env.TMDB_API_KEY,
       language: process.env.TMDB_LANGUAGE || 'en-US',
+      answerLanguages: (process.env.TMDB_ANSWER_LANGUAGES ?? 'fr').split(',').map((l) => l.trim()).filter(Boolean),
       pages: Number(process.env.TMDB_PAGES) || 25,
       tvRatio: process.env.TMDB_TV_RATIO != null ? Number(process.env.TMDB_TV_RATIO) : 0.25,
       baseUrl: process.env.TMDB_BASE_URL || undefined,
@@ -48,7 +49,7 @@ function normalize(s) {
     .toLowerCase()
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9 ]+/g, ' ')
-    .replace(/^(the|a|an|le|la|les) /, '')
+    .replace(/^(the|a|an|le|la|les|l) /, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -70,7 +71,7 @@ function levenshtein(a, b) {
 function isCorrect(guess, movie) {
   const g = normalize(guess);
   if (!g) return false;
-  return [movie.title, ...(movie.aliases || [])].some((answer) => {
+  return [movie.title, ...(movie.otherTitles || []), ...(movie.aliases || [])].some((answer) => {
     const a = normalize(answer);
     const tolerance = a.length >= 10 ? 2 : a.length >= 5 ? 1 : 0; // allow small typos
     return levenshtein(g, a) <= tolerance;
@@ -97,6 +98,7 @@ function publicState() {
     totalActors: game.movie?.actors.length ?? 0,
     finders: game.finders.map(({ name, points }) => ({ name, points })),
     solution: game.phase === 'reveal' ? game.movie.title : null,
+    otherTitles: game.phase === 'reveal' ? game.movie.otherTitles ?? [] : [],
     poster: game.phase === 'reveal' ? game.movie.poster ?? null : null,
     nextAt: game.nextAt,
     hintMs: HINT_MS,

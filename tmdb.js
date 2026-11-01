@@ -10,6 +10,7 @@ function createTmdbSource({
   baseUrl = 'https://api.themoviedb.org/3',
   imageBaseUrl = 'https://image.tmdb.org/t/p',
   language = 'en-US',
+  answerLanguages = ['fr'], // official titles in these languages are accepted too (ISO 639-1)
   pages = 25,        // titles are drawn from the top `pages` x 20 most-voted titles
   tvRatio = 0.25,    // share of rounds that are TV shows
   maxActors = 6,
@@ -34,12 +35,27 @@ function createTmdbSource({
     return res.json();
   }
 
-  function aliasesFor(title, details, alternatives) {
+  // Official titles in answerLanguages (e.g. fr-FR before fr-CA), without duplicates of the main title.
+  function translatedTitles(title, details) {
+    const countryRank = (t) => (t.iso_3166_1 === t.iso_639_1.toUpperCase() ? 0 : 1);
+    const titles = (details.translations?.translations || [])
+      .filter((t) => answerLanguages.includes(t.iso_639_1))
+      .sort((a, b) => answerLanguages.indexOf(a.iso_639_1) - answerLanguages.indexOf(b.iso_639_1)
+        || countryRank(a) - countryRank(b))
+      .map((t) => (t.data.title || t.data.name || '').trim())
+      .filter(Boolean);
+    const seen = new Set([title.toLowerCase()]);
+    return titles.filter((t) => !seen.has(t.toLowerCase()) && seen.add(t.toLowerCase()));
+  }
+
+  function aliasesFor(title, details, alternatives, translated) {
     const original = details.original_title || details.original_name;
-    const names = new Set([original, ...alternatives.map((a) => a.title)]);
+    const names = new Set([original, ...alternatives.map((a) => a.title), ...translated]);
     // "Pirates of the Caribbean: The Curse of the Black Pearl" -> also accept both halves.
-    const parts = title.split(/\s*[:–]\s+|\s+-\s+/);
-    if (parts.length > 1) parts.forEach((p) => names.add(p));
+    for (const t of [title, ...translated]) {
+      const parts = t.split(/\s*[:–]\s+|\s+-\s+/);
+      if (parts.length > 1) parts.forEach((p) => names.add(p));
+    }
     names.delete(title);
     return [...names].filter((n) => n && n.trim().length >= 2);
   }
@@ -58,7 +74,7 @@ function createTmdbSource({
     used.add(`${type}:${pick.id}`); // mark now, so a concurrent prefetch can't pick the same title
 
     const credits = type === 'tv' ? 'aggregate_credits' : 'credits';
-    const details = await get(`/${type}/${pick.id}`, { append_to_response: `${credits},alternative_titles` });
+    const details = await get(`/${type}/${pick.id}`, { append_to_response: `${credits},alternative_titles,translations` });
 
     // Main cast in billing order, then reversed so the most obvious actor comes last.
     const seen = new Set();
@@ -73,10 +89,12 @@ function createTmdbSource({
     const title = details.title || details.name;
     const date = details.release_date || details.first_air_date || '';
     const alt = details.alternative_titles;
+    const translated = translatedTitles(title, details);
     return {
       id: `${type}:${pick.id}`,
       title,
-      aliases: aliasesFor(title, details, alt.titles || alt.results || []),
+      otherTitles: translated,
+      aliases: aliasesFor(title, details, alt.titles || alt.results || [], translated),
       type,
       year: date ? Number(date.slice(0, 4)) : null,
       source: 'tmdb',
