@@ -20,7 +20,7 @@ function createTmdbSource({
   const isBearer = apiKey.startsWith('eyJ');
   const used = new Set();
   const posterBase = `${imageBaseUrl}/w342`;
-  const profileBase = `${imageBaseUrl}/w185`;
+  const profileBase = `${imageBaseUrl}/h632`;
   let prefetched = null;
 
   async function get(pathname, params = {}) {

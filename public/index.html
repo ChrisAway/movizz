@@ -7,6 +7,7 @@
 <style>
   :root { --bg:#14161c; --panel:#1f222b; --text:#eceef3; --muted:#8b91a1; --accent:#f5c518; --ok:#3ecf8e; --bad:#ef5b5b; }
   * { box-sizing: border-box; }
+  html { scroll-padding-bottom:110px; } /* centering ignores the area hidden by the pinned guess bar */
   body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); }
   header { padding:14px 24px; font-size:22px; font-weight:700; border-bottom:1px solid #2b2f3a; }
   header span { color:var(--accent); }
@@ -21,15 +22,10 @@
   .panel { background:var(--panel); border-radius:12px; padding:18px; }
   #stage h2 { margin:0 0 4px; }
   #stage .sub { color:var(--muted); margin-bottom:16px; }
-  #actors { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap:10px; align-content:start; min-height:200px; }
+  #actors { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap:10px; align-content:start; min-height:200px; }
   .actor { min-width:0; overflow-wrap:anywhere; padding:12px 16px; border-radius:8px; background:#2a2e3a; font-size:20px; animation: pop .35s ease-out; display:flex; align-items:center; gap:12px; }
   .actor small { margin-right:0 !important; }
-  .actor .photo { width:56px; height:84px; flex:none; border-radius:6px; background:#1a1d25; overflow:hidden; display:grid; place-items:center; }
-  .actor .photo.none { display:none; }
-  .actor .photo.waiting::after { content:'📷'; font-size:18px; opacity:.35; animation: blink 1s infinite alternate; }
-  .actor .photo img { width:100%; height:100%; object-fit:cover; animation: fade .6s ease-out; }
-  @keyframes fade { from { opacity:0 } to { opacity:1 } }
-  @keyframes blink { to { opacity:.1 } }
+  .actor .photo { width:150px; height:225px; flex:none; border-radius:8px; background:#1a1d25; object-fit:cover; }
   .actor small { color:var(--muted); margin-right:10px; }
   .actor.pending { background:transparent; border:1px dashed #3a3f4d; color:var(--muted); font-size:15px; animation:none; }
   @keyframes pop { from { transform:scale(.9); opacity:0 } to { transform:none; opacity:1 } }
@@ -38,6 +34,9 @@
   #solution { font-size:28px; font-weight:700; color:var(--accent); text-align:center; padding:14px; }
   #solution .also { font-size:17px; font-weight:500; color:var(--muted); font-style:italic; margin-top:4px; }
   #solution img { display:block; margin:12px auto 0; max-height:260px; border-radius:8px; box-shadow:0 6px 24px #0008; }
+  /* Stays pinned to the bottom of the window while the actor list scrolls. */
+  #guessbar { position:sticky; bottom:0; z-index:1; margin:16px -18px -18px; padding:2px 18px 12px; background:var(--panel); border-radius:0 0 12px 12px; box-shadow:0 -8px 16px -8px #0009; }
+  #guessbar #bar { margin:0 0 12px; }
   #guessForm { display:flex; gap:10px; }
   #guessForm input { flex:1; }
   #result { min-height:1.4em; margin-top:8px; font-weight:600; }
@@ -75,13 +74,15 @@
       <div class="sub" id="subtitle"></div>
       <div id="solution" class="hidden"></div>
       <div id="actors"></div>
-      <div id="bar"><div></div></div>
-      <form id="guessForm">
-        <input id="guess" placeholder="Type the movie / TV show title…" autocomplete="off">
-        <button>Guess</button>
-      </form>
-      <div id="result"></div>
       <div id="source"></div>
+      <div id="guessbar">
+        <div id="bar"><div></div></div>
+        <form id="guessForm">
+          <input id="guess" placeholder="Type the movie / TV show title…" autocomplete="off">
+          <button>Guess</button>
+        </form>
+        <div id="result"></div>
+      </div>
     </div>
   </section>
   <aside>
@@ -97,6 +98,7 @@ let me = JSON.parse(sessionStorage.getItem('castquiz') || 'null');
 let state = null;
 let clockOffset = 0;
 let lastRound = 0;
+let lastPhase = null;
 
 function el(tag, text, cls) {
   const e = document.createElement(tag);
@@ -160,7 +162,7 @@ function render(s) {
       : 'Round over — next one starting soon…';
   }
 
-  renderActors(s);
+  const newActor = renderActors(s);
 
   const source = $('source');
   if (s.source === 'tmdb') {
@@ -182,9 +184,15 @@ function render(s) {
       img.src = s.poster;
       img.alt = '';
       img.onerror = () => img.remove();
+      img.onload = () => center($('solution')); // its height changes once the poster has loaded
       $('solution').append(img);
     }
   }
+
+  // Keep the action in view: the newest actor while playing, the answer when the round ends.
+  if (s.phase === 'playing' && newActor) center(newActor);
+  else if (s.phase === 'reveal' && lastPhase !== 'reveal') center($('solution'));
+  lastPhase = s.phase;
 
   const canGuess = s.phase === 'playing' && !myself?.found;
   $('guess').disabled = !canGuess;
@@ -214,27 +222,31 @@ function renderActors(s) {
     list.dataset.round = s.round;
   }
   const rows = list.children;
+  let added = null;
   s.actors.forEach((a, i) => {
     let row = rows[i];
     if (!row) {
-      row = el('div', null, 'actor');
-      row.append(el('div', null, 'photo'), el('small', `#${i + 1}`), a.name);
+      added = row = el('div', null, 'actor');
+      if (a.photo) {
+        const img = el('img', null, 'photo');
+        img.src = a.photo;
+        img.alt = '';
+        img.onerror = () => img.remove();
+        row.append(img);
+      }
+      row.append(el('small', `#${i + 1}`), a.name);
       list.append(row);
-    }
-    const box = row.firstElementChild;
-    box.classList.toggle('waiting', a.photoPending);
-    box.classList.toggle('none', !a.photo && !a.photoPending);
-    if (a.photo && !box.querySelector('img')) {
-      const img = el('img');
-      img.src = a.photo;
-      img.alt = '';
-      img.onerror = () => box.classList.add('none');
-      box.append(img);
     }
   });
   for (let i = s.actors.length; s.phase !== 'loading' && i < s.totalActors; i++) {
     list.append(el('div', `Actor #${i + 1} — hidden`, 'actor pending'));
   }
+  return added; // the newest row added by this update, if any
+}
+
+// Brings an element to the middle of the window (or as close as the page allows).
+function center(elem) {
+  elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function tick() {

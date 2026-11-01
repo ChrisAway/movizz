@@ -9,7 +9,6 @@ const { createTmdbSource } = require('./tmdb');
 const PORT = Number(process.env.PORT) || 3000;
 const HINT_MS = Number(process.env.HINT_MS) || 10_000;   // delay between actor hints
 const REVEAL_MS = Number(process.env.REVEAL_MS) || 6_000; // time the solution stays on screen
-const PHOTO_MS = Number(process.env.PHOTO_MS) || 5_000;  // delay before an actor's photo appears
 const MAX_FINDERS = 10;                                   // 10, 9, ... 1 points
 
 const MOVIES = JSON.parse(fs.readFileSync(path.join(__dirname, 'movies.json'), 'utf8'));
@@ -34,8 +33,6 @@ const game = {
   round: 0,
   movie: null,
   revealed: [],       // actors shown so far
-  photosShown: 0,     // how many of the revealed actors also show their photo
-  photoTimer: null,
   finders: [],        // [{ id, name, points }]
   nextAt: null,       // timestamp of the next hint / next round
   timer: null,
@@ -92,8 +89,7 @@ function publicState() {
     source: game.movie?.source ?? null,
     actors: game.revealed.map((name, i) => ({
       name,
-      photo: i < game.photosShown ? game.movie.photos?.[i] ?? null : null,
-      photoPending: i >= game.photosShown && !!game.movie.photos?.[i],
+      photo: game.movie.photos?.[i] ?? null,
     })),
     totalActors: game.movie?.actors.length ?? 0,
     finders: game.finders.map(({ name, points }) => ({ name, points })),
@@ -158,7 +154,6 @@ async function startRound() {
     return broadcastState();
   }
   clearTimeout(game.timer);
-  clearTimeout(game.photoTimer);
   game.phase = 'loading';
   game.nextAt = null;
   game.revealed = [];
@@ -176,16 +171,9 @@ async function startRound() {
   nextHint();
 }
 
-// Reveals the next actor's name now, and their photo PHOTO_MS later.
 function nextHint() {
   if (game.revealed.length < game.movie.actors.length) {
-    game.photosShown = game.revealed.length;
     game.revealed.push(game.movie.actors[game.revealed.length]);
-    clearTimeout(game.photoTimer);
-    game.photoTimer = setTimeout(() => {
-      game.photosShown = game.revealed.length;
-      broadcastState();
-    }, PHOTO_MS);
     schedule(HINT_MS, nextHint);
     broadcastState();
   } else {
@@ -196,8 +184,6 @@ function nextHint() {
 function endRound(reason) {
   game.phase = 'reveal';
   game.revealed = game.movie.actors;
-  game.photosShown = game.revealed.length;
-  clearTimeout(game.photoTimer);
   feed(`${reason} The answer was "${game.movie.title}".`);
   schedule(REVEAL_MS, startRound);
   broadcastState();
@@ -248,7 +234,8 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    // no-cache: browsers must re-check, so a reload always picks up the latest page.
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
     return fs.createReadStream(path.join(__dirname, 'public', 'index.html')).pipe(res);
   }
 
