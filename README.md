@@ -9,7 +9,9 @@ npm start
 Open http://localhost:3000 (other players: http://<your-ip>:3000).
 
 ## Rules
-- Each round the server picks a title and reveals one actor; another actor is added every 10 s.
+- Each round the server picks a title (its year and whether it is a movie or TV show are shown)
+  and reveals one actor; another actor is added every 10 s.
+  With TMDb, each actor's photo appears 5 s after their name.
 - First correct answer scores 10, second 9, … tenth 1.
 - The round ends when every connected player has found it, 10 players have found it,
   or 10 s after the last actor. Then the solution (with its poster) is shown and the next title starts.
@@ -43,9 +45,11 @@ This product uses the TMDB API but is not endorsed or certified by TMDB.
 | `PORT` | 3000 | HTTP port |
 | `HINT_MS` | 10000 | Delay between actors |
 | `REVEAL_MS` | 6000 | Time the solution stays on screen |
+| `PHOTO_MS` | 5000 | Delay between an actor's name and their photo |
 | `TMDB_API_KEY` | – | Enables TMDb |
 | `TMDB_LANGUAGE` | en-US | Language of titles, e.g. `fr-FR` |
 | `TMDB_PAGES` | 25 | Pool size: top `pages × 20` most-voted titles (lower = more famous titles) |
 | `TMDB_TV_RATIO` | 0.25 | Share of rounds that are TV shows (0 = movies only) |
+| `TMDB_IMAGE_BASE` | https://image.tmdb.org/t/p | Where posters and actor photos are loaded from |
 
 You can add titles to `movies.json` (used without TMDb); list the actors from least to most obvious.

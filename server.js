@@ -9,6 +9,7 @@ const { createTmdbSource } = require('./tmdb');
 const PORT = Number(process.env.PORT) || 3000;
 const HINT_MS = Number(process.env.HINT_MS) || 10_000;   // delay between actor hints
 const REVEAL_MS = Number(process.env.REVEAL_MS) || 6_000; // time the solution stays on screen
+const PHOTO_MS = Number(process.env.PHOTO_MS) || 5_000;  // delay before an actor's photo appears
 const MAX_FINDERS = 10;                                   // 10, 9, ... 1 points
 
 const MOVIES = JSON.parse(fs.readFileSync(path.join(__dirname, 'movies.json'), 'utf8'));
@@ -21,6 +22,7 @@ const tmdb = process.env.TMDB_API_KEY
       pages: Number(process.env.TMDB_PAGES) || 25,
       tvRatio: process.env.TMDB_TV_RATIO != null ? Number(process.env.TMDB_TV_RATIO) : 0.25,
       baseUrl: process.env.TMDB_BASE_URL || undefined,
+      imageBaseUrl: process.env.TMDB_IMAGE_BASE || undefined,
     })
   : null;
 
@@ -31,6 +33,8 @@ const game = {
   round: 0,
   movie: null,
   revealed: [],       // actors shown so far
+  photosShown: 0,     // how many of the revealed actors also show their photo
+  photoTimer: null,
   finders: [],        // [{ id, name, points }]
   nextAt: null,       // timestamp of the next hint / next round
   timer: null,
@@ -83,8 +87,13 @@ function publicState() {
     phase: game.phase,
     round: game.round,
     type: game.movie?.type ?? null,
-    year: game.phase === 'reveal' ? game.movie.year : null,
-    actors: game.revealed,
+    year: game.movie?.year ?? null,
+    source: game.movie?.source ?? null,
+    actors: game.revealed.map((name, i) => ({
+      name,
+      photo: i < game.photosShown ? game.movie.photos?.[i] ?? null : null,
+      photoPending: i >= game.photosShown && !!game.movie.photos?.[i],
+    })),
     totalActors: game.movie?.actors.length ?? 0,
     finders: game.finders.map(({ name, points }) => ({ name, points })),
     solution: game.phase === 'reveal' ? game.movie.title : null,
@@ -119,7 +128,7 @@ function nextLocalMovie() {
   if (game.deck.length === 0) {
     game.deck = [...MOVIES].sort(() => Math.random() - 0.5);
   }
-  return game.deck.pop();
+  return { ...game.deck.pop(), source: 'local' };
 }
 
 function schedule(ms, fn) {
@@ -147,6 +156,7 @@ async function startRound() {
     return broadcastState();
   }
   clearTimeout(game.timer);
+  clearTimeout(game.photoTimer);
   game.phase = 'loading';
   game.nextAt = null;
   game.revealed = [];
@@ -156,18 +166,24 @@ async function startRound() {
   game.round++;
   game.phase = 'playing';
   game.movie = movie;
-  game.revealed = [game.movie.actors[0]];
+  game.revealed = [];
   game.finders = [];
   for (const p of players.values()) p.foundRank = null;
   console.log(`[round ${game.round}] ${game.movie.title}`);
   feed(`Round ${game.round}: a new ${game.movie.type === 'tv' ? 'TV show' : 'movie'}!`);
-  schedule(HINT_MS, nextHint);
-  broadcastState();
+  nextHint();
 }
 
+// Reveals the next actor's name now, and their photo PHOTO_MS later.
 function nextHint() {
   if (game.revealed.length < game.movie.actors.length) {
+    game.photosShown = game.revealed.length;
     game.revealed.push(game.movie.actors[game.revealed.length]);
+    clearTimeout(game.photoTimer);
+    game.photoTimer = setTimeout(() => {
+      game.photosShown = game.revealed.length;
+      broadcastState();
+    }, PHOTO_MS);
     schedule(HINT_MS, nextHint);
     broadcastState();
   } else {
@@ -178,6 +194,8 @@ function nextHint() {
 function endRound(reason) {
   game.phase = 'reveal';
   game.revealed = game.movie.actors;
+  game.photosShown = game.revealed.length;
+  clearTimeout(game.photoTimer);
   feed(`${reason} The answer was "${game.movie.title}".`);
   schedule(REVEAL_MS, startRound);
   broadcastState();

@@ -21,8 +21,15 @@
   .panel { background:var(--panel); border-radius:12px; padding:18px; }
   #stage h2 { margin:0 0 4px; }
   #stage .sub { color:var(--muted); margin-bottom:16px; }
-  #actors { display:flex; flex-direction:column; gap:10px; min-height:200px; }
-  .actor { padding:12px 16px; border-radius:8px; background:#2a2e3a; font-size:20px; animation: pop .35s ease-out; }
+  #actors { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap:10px; align-content:start; min-height:200px; }
+  .actor { min-width:0; overflow-wrap:anywhere; padding:12px 16px; border-radius:8px; background:#2a2e3a; font-size:20px; animation: pop .35s ease-out; display:flex; align-items:center; gap:12px; }
+  .actor small { margin-right:0 !important; }
+  .actor .photo { width:56px; height:84px; flex:none; border-radius:6px; background:#1a1d25; overflow:hidden; display:grid; place-items:center; }
+  .actor .photo.none { display:none; }
+  .actor .photo.waiting::after { content:'📷'; font-size:18px; opacity:.35; animation: blink 1s infinite alternate; }
+  .actor .photo img { width:100%; height:100%; object-fit:cover; animation: fade .6s ease-out; }
+  @keyframes fade { from { opacity:0 } to { opacity:1 } }
+  @keyframes blink { to { opacity:.1 } }
   .actor small { color:var(--muted); margin-right:10px; }
   .actor.pending { background:transparent; border:1px dashed #3a3f4d; color:var(--muted); font-size:15px; animation:none; }
   @keyframes pop { from { transform:scale(.9); opacity:0 } to { transform:none; opacity:1 } }
@@ -34,6 +41,8 @@
   #guessForm input { flex:1; }
   #result { min-height:1.4em; margin-top:8px; font-weight:600; }
   #result.ok { color:var(--ok); } #result.bad { color:var(--bad); }
+  #source { margin-top:10px; text-align:right; font-size:12px; color:var(--muted); opacity:.6; }
+  #source a { color:inherit; }
   h3 { margin:0 0 10px; font-size:15px; text-transform:uppercase; color:var(--muted); letter-spacing:.05em; }
   ol, ul { margin:0; padding-left:20px; }
   #scores li { padding:4px 0; display:flex; justify-content:space-between; }
@@ -44,7 +53,7 @@
   #feed { list-style:none; padding:0; max-height:220px; overflow-y:auto; font-size:14px; color:var(--muted); }
   #feed li { padding:3px 0; border-bottom:1px solid #2a2e3a; }
   aside { display:flex; flex-direction:column; gap:20px; }
-  @media (max-width:800px) { #game { grid-template-columns:1fr; } }
+  @media (max-width:800px) { #game { grid-template-columns:minmax(0, 1fr); padding:12px; } }
 </style>
 </head>
 <body>
@@ -71,6 +80,7 @@
         <button>Guess</button>
       </form>
       <div id="result"></div>
+      <div id="source"></div>
     </div>
   </section>
   <aside>
@@ -143,21 +153,23 @@ function render(s) {
     $('title').textContent = 'Picking the next title…';
     $('subtitle').textContent = '';
   } else {
-    $('title').textContent = `Round ${s.round} — guess the ${kind}`;
+    $('title').textContent = `Round ${s.round} — guess the ${kind}` + (s.year ? ` from ${s.year}` : '');
     $('subtitle').textContent = s.phase === 'playing'
       ? `Actor ${s.actors.length} of ${s.totalActors} · a new actor every ${s.hintMs / 1000}s`
       : 'Round over — next one starting soon…';
   }
 
-  const actors = $('actors');
-  actors.replaceChildren();
-  s.actors.forEach((name, i) => {
-    const d = el('div', null, 'actor');
-    d.append(el('small', `#${i + 1}`), name);
-    actors.append(d);
-  });
-  for (let i = s.actors.length; s.phase !== 'loading' && i < s.totalActors; i++) {
-    actors.append(el('div', `Actor #${i + 1} — hidden`, 'actor pending'));
+  renderActors(s);
+
+  const source = $('source');
+  if (s.source === 'tmdb') {
+    const link = el('a', 'TMDb');
+    link.href = 'https://www.themoviedb.org';
+    link.target = '_blank';
+    link.rel = 'noopener';
+    source.replaceChildren('Data: ', link);
+  } else {
+    source.textContent = s.source === 'local' ? 'Data: local list' : '';
   }
 
   $('solution').classList.toggle('hidden', s.phase !== 'reveal');
@@ -189,6 +201,38 @@ function render(s) {
 
   const finders = $('finders');
   finders.replaceChildren(...s.finders.map((f) => el('li', `${f.name} (+${f.points})`)));
+}
+
+// Updates the actor list in place, so revealed rows and photos don't reload or re-animate.
+function renderActors(s) {
+  const list = $('actors');
+  list.querySelectorAll('.pending').forEach((p) => p.remove());
+  if (list.dataset.round !== String(s.round) || list.children.length > s.actors.length) {
+    list.replaceChildren();
+    list.dataset.round = s.round;
+  }
+  const rows = list.children;
+  s.actors.forEach((a, i) => {
+    let row = rows[i];
+    if (!row) {
+      row = el('div', null, 'actor');
+      row.append(el('div', null, 'photo'), el('small', `#${i + 1}`), a.name);
+      list.append(row);
+    }
+    const box = row.firstElementChild;
+    box.classList.toggle('waiting', a.photoPending);
+    box.classList.toggle('none', !a.photo && !a.photoPending);
+    if (a.photo && !box.querySelector('img')) {
+      const img = el('img');
+      img.src = a.photo;
+      img.alt = '';
+      img.onerror = () => box.classList.add('none');
+      box.append(img);
+    }
+  });
+  for (let i = s.actors.length; s.phase !== 'loading' && i < s.totalActors; i++) {
+    list.append(el('div', `Actor #${i + 1} — hidden`, 'actor pending'));
+  }
 }
 
 function tick() {

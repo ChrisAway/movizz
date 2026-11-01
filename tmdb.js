@@ -1,6 +1,5 @@
 // TMDb source: picks a random well-known movie / TV show and its main cast.
 // API docs: https://developer.themoviedb.org/reference
-const IMAGE_BASE = 'https://image.tmdb.org/t/p/w342';
 
 // Genres that make bad quiz rounds (voice casts, documentaries, talk/reality/news/kids TV).
 const EXCLUDED_MOVIE_GENRES = '16,99';
@@ -9,6 +8,7 @@ const EXCLUDED_TV_GENRES = '16,99,10762,10763,10764,10767';
 function createTmdbSource({
   apiKey,
   baseUrl = 'https://api.themoviedb.org/3',
+  imageBaseUrl = 'https://image.tmdb.org/t/p',
   language = 'en-US',
   pages = 25,        // titles are drawn from the top `pages` x 20 most-voted titles
   tvRatio = 0.25,    // share of rounds that are TV shows
@@ -18,6 +18,8 @@ function createTmdbSource({
   // A v4 "API Read Access Token" is a JWT (starts with eyJ); otherwise it is a v3 API key.
   const isBearer = apiKey.startsWith('eyJ');
   const used = new Set();
+  const posterBase = `${imageBaseUrl}/w342`;
+  const profileBase = `${imageBaseUrl}/w185`;
   let prefetched = null;
 
   async function get(pathname, params = {}) {
@@ -65,7 +67,6 @@ function createTmdbSource({
       .sort((a, b) => a.order - b.order)
       .filter((c) => !seen.has(c.name) && seen.add(c.name))
       .slice(0, maxActors)
-      .map((c) => c.name)
       .reverse();
     if (cast.length < minActors) return null;
 
@@ -78,8 +79,10 @@ function createTmdbSource({
       aliases: aliasesFor(title, details, alt.titles || alt.results || []),
       type,
       year: date ? Number(date.slice(0, 4)) : null,
-      poster: details.poster_path ? IMAGE_BASE + details.poster_path : null,
-      actors: cast,
+      source: 'tmdb',
+      poster: details.poster_path ? posterBase + details.poster_path : null,
+      actors: cast.map((c) => c.name),
+      photos: cast.map((c) => (c.profile_path ? profileBase + c.profile_path : null)),
     };
   }
 
@@ -97,12 +100,16 @@ function createTmdbSource({
   }
 
   return {
-    // Returns the next title and immediately starts loading the one after, so rounds start without delay.
+    // Returns the next title, then starts loading the one after so the next round starts without delay.
+    // Loads run one at a time, so two of them can never pick the same title.
     async next() {
-      if (!prefetched) prefetch();
-      const current = prefetched;
-      prefetch();
-      return current;
+      const current = prefetched ?? fetchUsable();
+      prefetched = null;
+      try {
+        return await current;
+      } finally {
+        prefetch();
+      }
     },
   };
 }
