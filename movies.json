@@ -24,5 +24,15 @@
   { "title": "Game of Thrones", "otherTitles": ["Le Trône de fer"], "type": "tv", "year": 2011, "actors": ["Charles Dance", "Lena Headey", "Kit Harington", "Emilia Clarke", "Sean Bean", "Peter Dinklage"] },
   { "title": "Stranger Things", "type": "tv", "year": 2016, "actors": ["David Harbour", "Finn Wolfhard", "Millie Bobby Brown", "Winona Ryder"] },
   { "title": "The Office", "type": "tv", "year": 2005, "actors": ["Ed Helms", "Rainn Wilson", "Jenna Fischer", "John Krasinski", "Steve Carell"] },
-  { "title": "Lost", "otherTitles": ["Lost : Les Disparus"], "type": "tv", "year": 2004, "actors": ["Terry O'Quinn", "Josh Holloway", "Evangeline Lilly", "Dominic Monaghan", "Matthew Fox"] }
+  { "title": "Lost", "otherTitles": ["Lost : Les Disparus"], "type": "tv", "year": 2004, "actors": ["Terry O'Quinn", "Josh Holloway", "Evangeline Lilly", "Dominic Monaghan", "Matthew Fox"] },
+  { "title": "Seinfeld", "type": "tv", "year": 1989, "actors": ["Michael Richards", "Jason Alexander", "Julia Louis-Dreyfus", "Jerry Seinfeld"] },
+  { "title": "Twin Peaks", "type": "tv", "year": 1990, "actors": ["Sherilyn Fenn", "Lara Flynn Boyle", "Mädchen Amick", "Sheryl Lee", "Kyle MacLachlan"] },
+  { "title": "The X-Files", "otherTitles": ["X-Files : Aux frontières du réel"], "aliases": ["X-Files"], "type": "tv", "year": 1993, "actors": ["Mitch Pileggi", "William B. Davis", "Gillian Anderson", "David Duchovny"] },
+  { "title": "The Sopranos", "otherTitles": ["Les Soprano"], "type": "tv", "year": 1999, "actors": ["Tony Sirico", "Steven Van Zandt", "Michael Imperioli", "Lorraine Bracco", "Edie Falco", "James Gandolfini"] },
+  { "title": "House", "otherTitles": ["Dr House"], "aliases": ["House M.D."], "type": "tv", "year": 2004, "actors": ["Omar Epps", "Jesse Spencer", "Robert Sean Leonard", "Lisa Edelstein", "Hugh Laurie"] },
+  { "title": "Prison Break", "type": "tv", "year": 2005, "actors": ["Robert Knepper", "Amaury Nolasco", "Sarah Wayne Callies", "Dominic Purcell", "Wentworth Miller"] },
+  { "title": "How I Met Your Mother", "type": "tv", "year": 2005, "actors": ["Alyson Hannigan", "Jason Segel", "Cobie Smulders", "Josh Radnor", "Neil Patrick Harris"] },
+  { "title": "Dexter", "type": "tv", "year": 2006, "actors": ["David Zayas", "C.S. Lee", "James Remar", "Jennifer Carpenter", "Michael C. Hall"] },
+  { "title": "The Big Bang Theory", "type": "tv", "year": 2007, "actors": ["Simon Helberg", "Kunal Nayyar", "Kaley Cuoco", "Johnny Galecki", "Jim Parsons"] },
+  { "title": "Sherlock", "type": "tv", "year": 2010, "actors": ["Rupert Graves", "Una Stubbs", "Andrew Scott", "Martin Freeman", "Benedict Cumberbatch"] }
 ]

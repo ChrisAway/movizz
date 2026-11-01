@@ -11,6 +11,7 @@
   body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); }
   header { padding:14px 24px; font-size:22px; font-weight:700; border-bottom:1px solid #2b2f3a; }
   header span { color:var(--accent); }
+  header #mode { margin-left:12px; font-size:13px; font-weight:500; color:var(--muted); }
   .hidden { display:none !important; }
   #login { max-width:360px; margin:15vh auto; background:var(--panel); padding:28px; border-radius:12px; text-align:center; }
   input, button { font:inherit; padding:10px 14px; border-radius:8px; border:1px solid #3a3f4d; background:#12141a; color:var(--text); }
@@ -57,7 +58,7 @@
 </style>
 </head>
 <body>
-<header>🎬 Cast <span>Quiz</span></header>
+<header>🎬 Cast <span>Quiz</span> <small id="mode"></small></header>
 
 <form id="login">
   <h2>Who's in the cast?</h2>
@@ -163,6 +164,7 @@ function render(s) {
   }
 
   const newActor = renderActors(s);
+  $('mode').textContent = s.mode || '';
 
   const source = $('source');
   if (s.source === 'tmdb') {

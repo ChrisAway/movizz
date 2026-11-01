@@ -12,13 +12,15 @@ function createTmdbSource({
   language = 'en-US',
   answerLanguages = ['fr'], // official titles in these languages are accepted too (ISO 639-1)
   pages = 25,        // titles are drawn from the top `pages` x 20 most-voted titles
-  tvRatio = 0.25,    // share of rounds that are TV shows
+  tvRatio = 0.25,    // share of rounds that are TV shows (1 = TV only, 0 = movies only)
+  fromYear = null,   // only titles released / first aired from this year on
   maxActors = 6,
   minActors = 4,
 }) {
   // A v4 "API Read Access Token" is a JWT (starts with eyJ); otherwise it is a v3 API key.
   const isBearer = apiKey.startsWith('eyJ');
   const used = new Set();
+  const maxPages = { movie: pages, tv: pages }; // lowered once TMDb tells us how many pages exist
   const posterBase = `${imageBaseUrl}/w342`;
   const profileBase = `${imageBaseUrl}/h632`;
   let prefetched = null;
@@ -62,12 +64,15 @@ function createTmdbSource({
 
   async function fetchOne() {
     const type = Math.random() < tvRatio ? 'tv' : 'movie';
-    const list = await get(`/discover/${type}`, {
+    const filters = {
       sort_by: 'vote_count.desc',
       include_adult: 'false',
       without_genres: type === 'tv' ? EXCLUDED_TV_GENRES : EXCLUDED_MOVIE_GENRES,
-      page: 1 + Math.floor(Math.random() * pages),
-    });
+      page: 1 + Math.floor(Math.random() * maxPages[type]),
+    };
+    if (fromYear) filters[type === 'tv' ? 'first_air_date.gte' : 'primary_release_date.gte'] = `${fromYear}-01-01`;
+    const list = await get(`/discover/${type}`, filters);
+    if (list.total_pages) maxPages[type] = Math.max(1, Math.min(maxPages[type], list.total_pages));
     const candidates = list.results.filter((r) => !used.has(`${type}:${r.id}`));
     if (candidates.length === 0) return null;
     const pick = candidates[Math.floor(Math.random() * candidates.length)];

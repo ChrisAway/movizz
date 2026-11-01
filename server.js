@@ -11,7 +11,30 @@ const HINT_MS = Number(process.env.HINT_MS) || 10_000;   // delay between actor 
 const REVEAL_MS = Number(process.env.REVEAL_MS) || 6_000; // time the solution stays on screen
 const MAX_FINDERS = 10;                                   // 10, 9, ... 1 points
 
-const MOVIES = JSON.parse(fs.readFileSync(path.join(__dirname, 'movies.json'), 'utf8'));
+// Command-line options (--mode=tv --from=1995) take precedence over environment variables.
+const args = Object.fromEntries(
+  process.argv.slice(2).map((a) => a.match(/^--([\w-]+)=(.*)$/)).filter(Boolean).map((m) => [m[1], m[2]]),
+);
+
+// Game mode: mixed (movies + TV shows), tv (TV shows only) or movies (movies only).
+const MODE = (args.mode ?? process.env.MODE ?? 'mixed').toLowerCase();
+if (!['mixed', 'tv', 'movies'].includes(MODE)) {
+  console.error(`Unknown mode "${MODE}" — use mixed, tv or movies.`);
+  process.exit(1);
+}
+// Oldest release year allowed; TV-only mode defaults to 1990, the other modes to no limit.
+const FROM_YEAR = Number(args.from ?? process.env.FROM_YEAR ?? (MODE === 'tv' ? 1990 : 0)) || null;
+const TV_RATIO = { tv: 1, movies: 0, mixed: process.env.TMDB_TV_RATIO != null ? Number(process.env.TMDB_TV_RATIO) : 0.25 }[MODE];
+const MODE_LABEL = { mixed: 'Movies & TV shows', tv: 'TV shows only', movies: 'Movies only' }[MODE]
+  + (FROM_YEAR ? ` · from ${FROM_YEAR}` : '');
+
+const ALL_MOVIES = JSON.parse(fs.readFileSync(path.join(__dirname, 'movies.json'), 'utf8'));
+const MOVIES = ALL_MOVIES.filter((m) =>
+  (MODE === 'mixed' || (MODE === 'tv') === (m.type === 'tv')) && (!FROM_YEAR || m.year >= FROM_YEAR));
+if (MOVIES.length === 0) {
+  console.error(`movies.json has no titles for "${MODE_LABEL}".`);
+  process.exit(1);
+}
 
 // Titles come from TMDb when TMDB_API_KEY is set, otherwise (or if TMDb fails) from movies.json.
 const tmdb = process.env.TMDB_API_KEY
@@ -20,7 +43,8 @@ const tmdb = process.env.TMDB_API_KEY
       language: process.env.TMDB_LANGUAGE || 'en-US',
       answerLanguages: (process.env.TMDB_ANSWER_LANGUAGES ?? 'fr').split(',').map((l) => l.trim()).filter(Boolean),
       pages: Number(process.env.TMDB_PAGES) || 25,
-      tvRatio: process.env.TMDB_TV_RATIO != null ? Number(process.env.TMDB_TV_RATIO) : 0.25,
+      tvRatio: TV_RATIO,
+      fromYear: FROM_YEAR,
       baseUrl: process.env.TMDB_BASE_URL || undefined,
       imageBaseUrl: process.env.TMDB_IMAGE_BASE || undefined,
     })
@@ -87,6 +111,7 @@ function publicState() {
     type: game.movie?.type ?? null,
     year: game.movie?.year ?? null,
     source: game.movie?.source ?? null,
+    mode: MODE_LABEL,
     actors: game.revealed.map((name, i) => ({
       name,
       photo: game.movie.photos?.[i] ?? null,
@@ -292,5 +317,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   const source = tmdb ? `TMDb (${process.env.TMDB_LANGUAGE || 'en-US'})` : `movies.json (${MOVIES.length} titles)`;
-  console.log(`Cast Quiz running on http://localhost:${PORT} — titles from ${source}, hint every ${HINT_MS / 1000}s`);
+  console.log(`Cast Quiz running on http://localhost:${PORT} — ${MODE_LABEL}, titles from ${source}, hint every ${HINT_MS / 1000}s`);
 });

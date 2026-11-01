@@ -8,6 +8,19 @@ npm start
 
 Open http://localhost:3000 (other players: http://<your-ip>:3000).
 
+## Modes
+| Command | Titles |
+|---|---|
+| `npm start` | Movies and TV shows (default) |
+| `npm start -- --mode=tv` | TV shows only, first aired from 1990 |
+| `npm start -- --mode=tv --from=2005` | TV shows only, from 2005 |
+| `npm start -- --mode=movies` | Movies only |
+| `npm start -- --from=2000` | Movies and TV shows from 2000 |
+
+`--from` is the oldest year allowed: 1990 by default in TV mode, no limit in the other modes.
+The same settings can be given as environment variables `MODE` and `FROM_YEAR`.
+The current mode is shown next to the game's name at the top of the page.
+
 ## Rules
 - Each round the server picks a title (its year and whether it is a movie or TV show are shown)
   and reveals one actor; another actor is added every 10 s.
@@ -46,13 +59,15 @@ This product uses the TMDB API but is not endorsed or certified by TMDB.
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` | 3000 | HTTP port |
+| `MODE` | mixed | `mixed`, `tv` or `movies` (same as `--mode`) |
+| `FROM_YEAR` | 1990 in TV mode, none otherwise | Oldest release year (same as `--from`) |
 | `HINT_MS` | 10000 | Delay between actors |
 | `REVEAL_MS` | 6000 | Time the solution stays on screen |
 | `TMDB_API_KEY` | – | Enables TMDb |
 | `TMDB_LANGUAGE` | en-US | Language of the main title, e.g. `fr-FR` |
 | `TMDB_ANSWER_LANGUAGES` | fr | Other languages whose titles are accepted, comma-separated (e.g. `fr,nl`; empty = none) |
 | `TMDB_PAGES` | 25 | Pool size: top `pages × 20` most-voted titles (lower = more famous titles) |
-| `TMDB_TV_RATIO` | 0.25 | Share of rounds that are TV shows (0 = movies only) |
+| `TMDB_TV_RATIO` | 0.25 | Share of rounds that are TV shows in mixed mode |
 | `TMDB_IMAGE_BASE` | https://image.tmdb.org/t/p | Where posters and actor photos are loaded from |
 
 You can add titles to `movies.json` (used without TMDb); list the actors from least to most obvious.
