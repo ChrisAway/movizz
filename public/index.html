@@ -29,6 +29,7 @@
   #bar { height:6px; background:#2a2e3a; border-radius:3px; margin:16px 0; overflow:hidden; }
   #bar div { height:100%; background:var(--accent); width:0; }
   #solution { font-size:28px; font-weight:700; color:var(--accent); text-align:center; padding:14px; }
+  #solution img { display:block; margin:12px auto 0; max-height:260px; border-radius:8px; box-shadow:0 6px 24px #0008; }
   #guessForm { display:flex; gap:10px; }
   #guessForm input { flex:1; }
   #result { min-height:1.4em; margin-top:8px; font-weight:600; }
@@ -138,6 +139,9 @@ function render(s) {
   if (s.phase === 'waiting') {
     $('title').textContent = 'Waiting for players…';
     $('subtitle').textContent = '';
+  } else if (s.phase === 'loading') {
+    $('title').textContent = 'Picking the next title…';
+    $('subtitle').textContent = '';
   } else {
     $('title').textContent = `Round ${s.round} — guess the ${kind}`;
     $('subtitle').textContent = s.phase === 'playing'
@@ -152,12 +156,21 @@ function render(s) {
     d.append(el('small', `#${i + 1}`), name);
     actors.append(d);
   });
-  for (let i = s.actors.length; i < s.totalActors; i++) {
+  for (let i = s.actors.length; s.phase !== 'loading' && i < s.totalActors; i++) {
     actors.append(el('div', `Actor #${i + 1} — hidden`, 'actor pending'));
   }
 
   $('solution').classList.toggle('hidden', s.phase !== 'reveal');
-  if (s.phase === 'reveal') $('solution').textContent = `${s.solution} (${s.year})`;
+  if (s.phase === 'reveal') {
+    $('solution').textContent = s.year ? `${s.solution} (${s.year})` : s.solution;
+    if (s.poster) {
+      const img = el('img');
+      img.src = s.poster;
+      img.alt = '';
+      img.onerror = () => img.remove();
+      $('solution').append(img);
+    }
+  }
 
   const canGuess = s.phase === 'playing' && !myself?.found;
   $('guess').disabled = !canGuess;

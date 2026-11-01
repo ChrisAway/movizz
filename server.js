@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { createTmdbSource } = require('./tmdb');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HINT_MS = Number(process.env.HINT_MS) || 10_000;   // delay between actor hints
@@ -12,10 +13,21 @@ const MAX_FINDERS = 10;                                   // 10, 9, ... 1 points
 
 const MOVIES = JSON.parse(fs.readFileSync(path.join(__dirname, 'movies.json'), 'utf8'));
 
+// Titles come from TMDb when TMDB_API_KEY is set, otherwise (or if TMDb fails) from movies.json.
+const tmdb = process.env.TMDB_API_KEY
+  ? createTmdbSource({
+      apiKey: process.env.TMDB_API_KEY,
+      language: process.env.TMDB_LANGUAGE || 'en-US',
+      pages: Number(process.env.TMDB_PAGES) || 25,
+      tvRatio: process.env.TMDB_TV_RATIO != null ? Number(process.env.TMDB_TV_RATIO) : 0.25,
+      baseUrl: process.env.TMDB_BASE_URL || undefined,
+    })
+  : null;
+
 // ---------------------------------------------------------------- state
 const players = new Map(); // id -> { id, name, score, stream, foundRank }
 const game = {
-  phase: 'waiting',   // waiting | playing | reveal
+  phase: 'waiting',   // waiting | loading | playing | reveal
   round: 0,
   movie: null,
   revealed: [],       // actors shown so far
@@ -76,6 +88,7 @@ function publicState() {
     totalActors: game.movie?.actors.length ?? 0,
     finders: game.finders.map(({ name, points }) => ({ name, points })),
     solution: game.phase === 'reveal' ? game.movie.title : null,
+    poster: game.phase === 'reveal' ? game.movie.poster ?? null : null,
     nextAt: game.nextAt,
     hintMs: HINT_MS,
     serverNow: Date.now(),
@@ -102,7 +115,7 @@ function feed(text) {
 }
 
 // ---------------------------------------------------------------- game loop
-function nextMovie() {
+function nextLocalMovie() {
   if (game.deck.length === 0) {
     game.deck = [...MOVIES].sort(() => Math.random() - 0.5);
   }
@@ -115,15 +128,34 @@ function schedule(ms, fn) {
   game.timer = setTimeout(fn, ms);
 }
 
-function startRound() {
+async function nextMovie() {
+  if (tmdb) {
+    try {
+      return await tmdb.next();
+    } catch (err) {
+      console.error(`${err.message} — using movies.json for this round`);
+    }
+  }
+  return nextLocalMovie();
+}
+
+async function startRound() {
+  if (game.phase === 'loading') return;
   if (onlinePlayers().length === 0) {
     game.phase = 'waiting';
     game.nextAt = null;
     return broadcastState();
   }
+  clearTimeout(game.timer);
+  game.phase = 'loading';
+  game.nextAt = null;
+  game.revealed = [];
+  game.finders = [];
+  broadcastState();
+  const movie = await nextMovie();
   game.round++;
   game.phase = 'playing';
-  game.movie = nextMovie();
+  game.movie = movie;
   game.revealed = [game.movie.actors[0]];
   game.finders = [];
   for (const p of players.values()) p.foundRank = null;
@@ -252,5 +284,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Cast Quiz running on http://localhost:${PORT} (${MOVIES.length} titles, hint every ${HINT_MS / 1000}s)`);
+  const source = tmdb ? `TMDb (${process.env.TMDB_LANGUAGE || 'en-US'})` : `movies.json (${MOVIES.length} titles)`;
+  console.log(`Cast Quiz running on http://localhost:${PORT} — titles from ${source}, hint every ${HINT_MS / 1000}s`);
 });

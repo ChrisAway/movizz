@@ -1,9 +1,9 @@
 # Cast Quiz
 
-Multiplayer quiz: guess the movie / TV show from its cast. No dependencies — Node 18+ only.
+Multiplayer quiz: guess the movie / TV show from its cast. No dependencies — Node 24+ only.
 
 ```bash
-node server.js
+npm start
 ```
 
 Open http://localhost:3000 (other players: http://<your-ip>:3000).
@@ -12,10 +12,40 @@ Open http://localhost:3000 (other players: http://<your-ip>:3000).
 - Each round the server picks a title and reveals one actor; another actor is added every 10 s.
 - First correct answer scores 10, second 9, … tenth 1.
 - The round ends when every connected player has found it, 10 players have found it,
-  or 10 s after the last actor. Then the solution is shown and the next title starts.
+  or 10 s after the last actor. Then the solution (with its poster) is shown and the next title starts.
 - Answers ignore case, accents, punctuation and a leading "The", and tolerate small typos.
 
-## Config (env vars)
-`PORT` (3000), `HINT_MS` (10000), `REVEAL_MS` (6000).
+## Title source: TMDb
+Titles and casts come from [The Movie Database (TMDb)](https://www.themoviedb.org) when `TMDB_API_KEY` is set.
+Get a free key at https://www.themoviedb.org/settings/api — either the v3 "API Key" or the
+v4 "API Read Access Token" works.
 
-Add titles in `movies.json` — list actors from least to most obvious.
+```bash
+TMDB_API_KEY=your_key npm start
+```
+
+PowerShell: `$env:TMDB_API_KEY="your_key"; npm start`
+
+Each round draws a random title among the most-voted movies / TV shows (animation, documentaries,
+talk shows, reality and kids TV are excluded). Its top-billed cast is revealed in reverse order,
+so the lead actor comes last. The original title and TMDb's alternative titles are also accepted as answers.
+
+Without a key — or if TMDb can't be reached — the game uses the local `movies.json` instead.
+
+`npm start` runs Node with `--use-env-proxy`, so `HTTPS_PROXY` / `HTTP_PROXY` are honoured
+(needed behind a corporate proxy).
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+## Config (env vars)
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | 3000 | HTTP port |
+| `HINT_MS` | 10000 | Delay between actors |
+| `REVEAL_MS` | 6000 | Time the solution stays on screen |
+| `TMDB_API_KEY` | – | Enables TMDb |
+| `TMDB_LANGUAGE` | en-US | Language of titles, e.g. `fr-FR` |
+| `TMDB_PAGES` | 25 | Pool size: top `pages × 20` most-voted titles (lower = more famous titles) |
+| `TMDB_TV_RATIO` | 0.25 | Share of rounds that are TV shows (0 = movies only) |
+
+You can add titles to `movies.json` (used without TMDb); list the actors from least to most obvious.

@@ -1,0 +1,13 @@
+{
+  "name": "movizz",
+  "version": "1.0.0",
+  "description": "Multiplayer quiz: guess the movie / TV show from its cast",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node --use-env-proxy server.js"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
